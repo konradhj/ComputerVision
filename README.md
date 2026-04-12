@@ -47,7 +47,8 @@ Group left + right by study → bilateral JSON
 
 ```
 configs/
-  default.yaml              # All hyperparameters
+  default.yaml              # All hyperparameters (local)
+  idun.yaml                 # IDUN config (NTNU HPC, points to shared data)
 
 src/
   data/
@@ -111,27 +112,42 @@ conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvi
 pip install monai nibabel scikit-learn scipy pyyaml tqdm matplotlib
 ```
 
-## Data Preparation
+## Data
+
+### IDUN (no setup needed)
+
+The ODELIA2025 dataset is available on IDUN at:
+
+```
+/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/
+├── data/
+│   ├── CAM/
+│   │   ├── data_unilateral/<UID>/{Pre,Post_1,Post_2,Sub_1,T2}.nii.gz
+│   │   └── metadata_unilateral/annotation.csv    # UID, PatientID, Age, Lesion
+│   ├── MHA/   (same structure)
+│   ├── RSH/   (no annotation.csv — labels hidden for leaderboard)
+│   ├── RUMC/  (same structure)
+│   └── UKA/   (same structure)
+├── split_unilateral.csv          # UID, Fold, Split, Institution
+└── evaluation-method/
+```
+
+`configs/idun.yaml` already points to these paths. Labels are loaded automatically from each institution's `annotation.csv` (set `label_csv: "auto"`).
+
+5 institutions: CAM, MHA, RSH, RUMC, UKA. RSH labels are hidden for the leaderboard — those samples can only be used for inference.
+
+### Local setup
 
 1. Place your data under `data/` following the layout: `data/<Institution>/data_unilateral/<UID>/`
 2. Each UID folder should contain: `Pre.nii.gz`, `Post_1.nii.gz`, `Post_2.nii.gz`, `T2.nii.gz`
-3. Place `split_unilateral.csv` in the project root (columns: `UID`, `Fold`, `Split`, `Institution`)
-4. Place your label CSV and update `data.label_csv` in `configs/default.yaml`
+3. Place `split_unilateral.csv` in the project root
+4. Set `label_csv: "auto"` in `configs/default.yaml` to auto-load from per-institution annotation CSVs, or point to a single label CSV
 
 The label CSV should have either:
 - **Unilateral format**: columns `UID`, `Lesion` (0=normal, 1=benign, 2=malignant)
 - **Bilateral format**: columns `studyID`, `Lesion_Left`, `Lesion_Right`
 
 Both formats are auto-detected.
-
-### Data path resolution
-
-The dataset code tries these paths in order for each sample:
-1. `data/<Institution>/data_unilateral/<UID>/`
-2. `data/<UID>/`
-3. `data/data_unilateral/<UID>/`
-
-If your layout differs, update `_resolve_data_path()` in `src/data/dataset.py`.
 
 ## Usage
 
@@ -154,10 +170,10 @@ python scripts/train.py --config configs/default.yaml training.epochs=50 data.ba
 sbatch jobs/train.slurm
 
 # Check job status
-squeue -u <username>
+squeue -u konradj
 
 # Watch output live
-tail -f outputs/logs/slurm-<jobid>.out
+tail -f /cluster/work/konradj/breast_mri/outputs/logs/slurm-<jobid>.out
 
 # Cancel a job
 scancel <jobid>
@@ -240,12 +256,13 @@ All settings are in `configs/default.yaml`. Key parameters:
 
 ## IDUN Tips
 
-- **Data location**: Use `/cluster/work/<username>/` for large data — home directories have limited quota
+- **Data**: Already at `/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/` — read-only, shared across the course
+- **Outputs**: Written to `/cluster/work/konradj/breast_mri/` — personal work directory with plenty of space
 - **Time allocation**: `--time=0-08:00:00` is 8 hours; shorter requests get higher queue priority
 - **Memory**: `--mem=32G` is enough for 128x128x32 volumes; increase for larger spatial sizes
-- **Workers**: `--cpus-per-task` in SLURM should match `data.num_workers` in config
-- **Monitoring**: Check `outputs/logs/slurm-<jobid>.out` for training progress
-- **Multiple runs**: Copy `configs/default.yaml` to `configs/experiment_name.yaml` and modify
+- **Workers**: `--cpus-per-task` in SLURM should match `data.num_workers` in config (both set to 8)
+- **Monitoring**: `tail -f /cluster/work/konradj/breast_mri/outputs/logs/slurm-<jobid>.out`
+- **Multiple runs**: Copy `configs/idun.yaml` to `configs/experiment_name.yaml` and modify
 
 ## Experiment Workflow
 
@@ -256,21 +273,22 @@ Recommended order for a complete project:
 sbatch jobs/train.slurm
 
 # 2. Evaluate baseline
-python scripts/evaluate.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt
+python scripts/evaluate.py --config configs/idun.yaml \
+    --checkpoint /cluster/work/konradj/breast_mri/outputs/checkpoints/best.pt
 
 # 3. Calibrate
 sbatch jobs/calibrate.slurm
 
 # 4. Evaluate with calibration
-python scripts/evaluate.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt \
-    --temperature outputs/calibration/temperature.pt
+python scripts/evaluate.py --config configs/idun.yaml \
+    --checkpoint /cluster/work/konradj/breast_mri/outputs/checkpoints/best.pt \
+    --temperature /cluster/work/konradj/breast_mri/outputs/calibration/temperature.pt
 
 # 5. Sequence ablation (optional, takes longer)
-python scripts/ablation.py --config configs/default.yaml --epochs 30
+python scripts/ablation.py --config configs/idun.yaml --epochs 30
 
 # 6. Generate final submission
-python scripts/inference.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt \
-    --temperature outputs/calibration/temperature.pt --output_dir submissions/
+sbatch jobs/inference.slurm
 ```
 
 ## Submission Format
