@@ -12,7 +12,7 @@
 ### Why this design?
 
 | Decision | Rationale |
-|---|---|
+| --- | --- |
 | **3D model** | Breast MRI is volumetric — a 3D CNN captures spatial relationships across slices that 2D models miss |
 | **Multi-sequence input** | Pre (anatomy), Post-contrast (vascularity/enhancement patterns), T2 (tissue characterization) provide complementary diagnostic information |
 | **Unilateral training** | Clean separation — one model applied per-breast, no coupling between sides, doubles effective training samples |
@@ -21,7 +21,7 @@
 
 ### Pipeline overview
 
-```
+```text
 NIfTI files (Pre, Post_1, Post_2, T2)
     |
     v
@@ -45,10 +45,10 @@ Group left + right by study → bilateral JSON
 
 ## Project Structure
 
-```
+```text
 configs/
-  default.yaml              # All hyperparameters (local)
-  idun.yaml                 # IDUN config (NTNU HPC, points to shared data)
+  idun.yaml                 # IDUN config (points to shared course data)
+  default.yaml              # Local/generic config
 
 src/
   data/
@@ -78,28 +78,22 @@ scripts/
   ablation.py               # Sequence ablation study
 
 jobs/
-  train.slurm               # SLURM script for training on IDUN
-  inference.slurm           # SLURM script for generating submissions
-  calibrate.slurm           # SLURM script for temperature calibration
+  train.slurm               # SLURM job for training
+  inference.slurm           # SLURM job for generating submissions
+  calibrate.slurm           # SLURM job for temperature calibration
 ```
 
-## Setup
+## IDUN Setup (one-time)
 
-### Local
+### 1. SSH into IDUN
 
 ```bash
-pip install -r requirements.txt
+ssh konradj@idun.hpc.ntnu.no
 ```
 
-Requires Python 3.9+ with PyTorch, MONAI, scikit-learn, and standard scientific Python packages.
-
-### IDUN (NTNU HPC)
+### 2. Create conda environment
 
 ```bash
-# SSH into IDUN
-ssh <username>@idun.hpc.ntnu.no
-
-# Create conda environment (one-time)
 module purge
 module load Anaconda3/2023.09-0
 conda create -n breast_mri python=3.11 -y
@@ -112,13 +106,20 @@ conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvi
 pip install monai nibabel scikit-learn scipy pyyaml tqdm matplotlib
 ```
 
+### 3. Clone the repo
+
+```bash
+cd /cluster/work/konradj/
+git clone <your-repo-url> breast_mri
+```
+
+That's it. The data is already on IDUN (read-only, shared across the course) and `configs/idun.yaml` points to it.
+
 ## Data
 
-### IDUN (no setup needed)
+The ODELIA2025 dataset is at:
 
-The ODELIA2025 dataset is available on IDUN at:
-
-```
+```text
 /cluster/projects/vc/courses/TDT17/mic/ODELIA2025/
 ├── data/
 │   ├── CAM/
@@ -132,114 +133,123 @@ The ODELIA2025 dataset is available on IDUN at:
 └── evaluation-method/
 ```
 
-`configs/idun.yaml` already points to these paths. Labels are loaded automatically from each institution's `annotation.csv` (set `label_csv: "auto"`).
+- 5 institutions: CAM, MHA, RSH, RUMC, UKA
+- RSH labels are hidden for the leaderboard — those samples can only be used for inference
+- Labels are loaded automatically from each institution's `annotation.csv` (`label_csv: "auto"` in config)
+- Label mapping: 0 = normal, 1 = benign, 2 = malignant
 
-5 institutions: CAM, MHA, RSH, RUMC, UKA. RSH labels are hidden for the leaderboard — those samples can only be used for inference.
+## Running on IDUN
 
-### Local setup
-
-1. Place your data under `data/` following the layout: `data/<Institution>/data_unilateral/<UID>/`
-2. Each UID folder should contain: `Pre.nii.gz`, `Post_1.nii.gz`, `Post_2.nii.gz`, `T2.nii.gz`
-3. Place `split_unilateral.csv` in the project root
-4. Set `label_csv: "auto"` in `configs/default.yaml` to auto-load from per-institution annotation CSVs, or point to a single label CSV
-
-The label CSV should have either:
-- **Unilateral format**: columns `UID`, `Lesion` (0=normal, 1=benign, 2=malignant)
-- **Bilateral format**: columns `studyID`, `Lesion_Left`, `Lesion_Right`
-
-Both formats are auto-detected.
-
-## Usage
-
-### Train (local)
+All commands below are run from your repo directory on IDUN:
 
 ```bash
-python scripts/train.py --config configs/default.yaml
+cd /cluster/work/konradj/breast_mri
 ```
 
-Override any parameter from the command line:
+### Step 1: Train
 
 ```bash
-python scripts/train.py --config configs/default.yaml training.epochs=50 data.batch_size=2
-```
-
-### Train (IDUN)
-
-```bash
-# Submit training job
 sbatch jobs/train.slurm
+```
 
+Monitor your job:
+
+```bash
 # Check job status
 squeue -u konradj
 
-# Watch output live
+# Watch training output live (replace <jobid> with your job ID)
 tail -f /cluster/work/konradj/breast_mri/outputs/logs/slurm-<jobid>.out
 
-# Cancel a job
+# Cancel a job if needed
 scancel <jobid>
 ```
 
-### Evaluate
+Training saves checkpoints to `/cluster/work/konradj/breast_mri/outputs/checkpoints/`. The best model (by validation loss) is saved as `best.pt`.
+
+### Step 2: Evaluate
+
+Request an interactive GPU session, then run evaluation:
 
 ```bash
-python scripts/evaluate.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt
-python scripts/evaluate.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt --split test
+srun --account=konradj --partition=GPUQ --gres=gpu:1 --mem=16G --cpus-per-task=4 --time=0-01:00:00 --pty bash
+
+# Inside the interactive session:
+module purge
+module load Anaconda3/2023.09-0
+conda activate breast_mri
+
+python scripts/evaluate.py --config configs/idun.yaml \
+    --checkpoint /cluster/work/konradj/breast_mri/outputs/checkpoints/best.pt
 ```
 
-### Generate Submission
+### Step 3: Calibrate (optional improvement)
 
 ```bash
-python scripts/inference.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt
+sbatch jobs/calibrate.slurm
 ```
 
-Produces one JSON per study in `submissions/<study_id>/bilateral-breast-classification-likelihoods.json`:
+This learns a temperature parameter on the validation set and saves it to `/cluster/work/konradj/breast_mri/outputs/calibration/temperature.pt`.
 
-```json
-{
-  "left":  {"normal": 0.1, "benign": 0.2, "malignant": 0.7},
-  "right": {"normal": 0.8, "benign": 0.1, "malignant": 0.1}
-}
-```
-
-### Calibrate
+### Step 4: Generate submission
 
 ```bash
-python scripts/calibrate.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt
+sbatch jobs/inference.slurm
 ```
 
-Then use the learned temperature at inference:
+This produces bilateral JSON files in `/cluster/work/konradj/breast_mri/submissions/`.
+
+### Step 5: Sequence ablation (optional analysis)
+
+Request an interactive session with more time:
 
 ```bash
-python scripts/inference.py --config configs/default.yaml --checkpoint outputs/checkpoints/best.pt \
-    --temperature outputs/calibration/temperature.pt
+srun --account=konradj --partition=GPUQ --gres=gpu:1 --mem=32G --cpus-per-task=8 --time=0-06:00:00 --pty bash
+
+module purge
+module load Anaconda3/2023.09-0
+conda activate breast_mri
+
+python scripts/ablation.py --config configs/idun.yaml --epochs 30
 ```
 
-### Sequence Ablation
+### Overriding config from command line
+
+Any config parameter can be overridden:
 
 ```bash
-python scripts/ablation.py --config configs/default.yaml --epochs 30
+# In an interactive session or in a SLURM script:
+python scripts/train.py --config configs/idun.yaml training.epochs=50 data.batch_size=2
 ```
 
-Trains with different MRI sequence subsets and reports a comparison table showing each sequence's contribution.
+## IDUN Tips
+
+- **Data**: Read-only at `/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/` — no copying needed
+- **Outputs**: Written to `/cluster/work/konradj/breast_mri/outputs/` — plenty of space
+- **Time**: `train.slurm` requests 8 hours; shorter requests get higher queue priority
+- **Memory**: `--mem=32G` is enough for 128x128x32 volumes; increase for larger spatial sizes
+- **Batch size**: Reduce to 2 (`data.batch_size=2`) if you get GPU out-of-memory errors
+- **Workers**: `--cpus-per-task` in SLURM matches `data.num_workers` in config (both 8)
+- **Multiple experiments**: Copy `configs/idun.yaml` to `configs/experiment_name.yaml`, modify, and update the SLURM script to use it
 
 ## Evaluation Metrics
 
 | Metric | Purpose |
-|---|---|
+| --- | --- |
 | **Accuracy** | Overall correctness |
 | **Confusion matrix** | Per-class error patterns |
 | **Per-class precision, recall, F1** | Class-level performance |
 | **Malignant-vs-rest AUROC** | Ranking quality for the critical malignant class |
-| **Specificity @ 90% sensitivity** | Clinical operating point: how many false positives when catching 90% of cancers |
-| **Sensitivity @ 90% specificity** | Clinical operating point: how many cancers caught when allowing 10% false positive rate |
+| **Specificity @ 90% sensitivity** | Clinical: how many false positives when catching 90% of cancers |
+| **Sensitivity @ 90% specificity** | Clinical: how many cancers caught when allowing 10% false positive rate |
 | **ECE** | Expected Calibration Error — how reliable the predicted probabilities are |
 
 ## Configuration
 
-All settings are in `configs/default.yaml`. Key parameters:
+All settings are in `configs/idun.yaml`. Key parameters:
 
 | Parameter | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `data.sequences` | `[Pre, Post_1, Post_2, T2]` | MRI sequences to use as input channels |
 | `data.spatial_size` | `[128, 128, 32]` | Volume resize target |
 | `data.batch_size` | `4` | Batch size (reduce to 2 if GPU OOM) |
@@ -254,48 +264,11 @@ All settings are in `configs/default.yaml`. Key parameters:
 | `augmentation.rand_affine_prob` | `0.3` | Random affine transform probability |
 | `calibration.enabled` | `false` | Enable temperature scaling |
 
-## IDUN Tips
-
-- **Data**: Already at `/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/` — read-only, shared across the course
-- **Outputs**: Written to `/cluster/work/konradj/breast_mri/` — personal work directory with plenty of space
-- **Time allocation**: `--time=0-08:00:00` is 8 hours; shorter requests get higher queue priority
-- **Memory**: `--mem=32G` is enough for 128x128x32 volumes; increase for larger spatial sizes
-- **Workers**: `--cpus-per-task` in SLURM should match `data.num_workers` in config (both set to 8)
-- **Monitoring**: `tail -f /cluster/work/konradj/breast_mri/outputs/logs/slurm-<jobid>.out`
-- **Multiple runs**: Copy `configs/idun.yaml` to `configs/experiment_name.yaml` and modify
-
-## Experiment Workflow
-
-Recommended order for a complete project:
-
-```bash
-# 1. Baseline training
-sbatch jobs/train.slurm
-
-# 2. Evaluate baseline
-python scripts/evaluate.py --config configs/idun.yaml \
-    --checkpoint /cluster/work/konradj/breast_mri/outputs/checkpoints/best.pt
-
-# 3. Calibrate
-sbatch jobs/calibrate.slurm
-
-# 4. Evaluate with calibration
-python scripts/evaluate.py --config configs/idun.yaml \
-    --checkpoint /cluster/work/konradj/breast_mri/outputs/checkpoints/best.pt \
-    --temperature /cluster/work/konradj/breast_mri/outputs/calibration/temperature.pt
-
-# 5. Sequence ablation (optional, takes longer)
-python scripts/ablation.py --config configs/idun.yaml --epochs 30
-
-# 6. Generate final submission
-sbatch jobs/inference.slurm
-```
-
 ## Submission Format
 
 The evaluator expects this directory structure:
 
-```
+```text
 submissions/
   <study_id>/
     bilateral-breast-classification-likelihoods.json
@@ -306,14 +279,14 @@ Each JSON file contains:
 ```json
 {
   "left": {
-    "normal": <float>,
-    "benign": <float>,
-    "malignant": <float>
+    "normal": 0.1,
+    "benign": 0.2,
+    "malignant": 0.7
   },
   "right": {
-    "normal": <float>,
-    "benign": <float>,
-    "malignant": <float>
+    "normal": 0.8,
+    "benign": 0.1,
+    "malignant": 0.1
   }
 }
 ```
