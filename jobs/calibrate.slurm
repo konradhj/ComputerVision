@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --account=ie-idi            # TODO: update to your account
+#SBATCH --account=konradj
 #SBATCH --job-name=breast_mri_cal
 #SBATCH --time=0-00:30:00           # 30 minutes
 #SBATCH --partition=GPUQ

@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --account=ie-idi            # TODO: update to your account
+#SBATCH --account=konradj            # TODO: update to your account
 #SBATCH --job-name=breast_mri_infer
 #SBATCH --time=0-01:00:00           # 1 hour is plenty for inference
 #SBATCH --partition=GPUQ
@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --output=outputs/logs/slurm-infer-%j.out
 #SBATCH --error=outputs/logs/slurm-infer-%j.err
-#SBATCH --mail-user=your.email@ntnu.no   # TODO: update
+#SBATCH --mail-user=konradj@ntnu.no   # TODO: update
 #SBATCH --mail-type=ALL
 
 cd ${SLURM_SUBMIT_DIR}

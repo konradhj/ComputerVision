@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --account=ie-idi            # TODO: update to your account (e.g. ie-idi, ie-ite)
+#SBATCH --account=konradj            # TODO: update to your account (e.g. ie-idi, ie-ite)
 #SBATCH --job-name=breast_mri_train
 #SBATCH --time=0-08:00:00           # 8 hours — adjust based on dataset size
 #SBATCH --partition=GPUQ
@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --output=outputs/logs/slurm-%j.out
 #SBATCH --error=outputs/logs/slurm-%j.err
-#SBATCH --mail-user=your.email@ntnu.no   # TODO: update
+#SBATCH --mail-user=konradj@ntnu.no   # TODO: update
 #SBATCH --mail-type=ALL
 
 echo "========================================="
