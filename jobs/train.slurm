@@ -7,8 +7,8 @@
 #SBATCH --mem=32G                   # 32GB RAM for 3D volumes
 #SBATCH --cpus-per-task=8           # for dataloader workers
 #SBATCH --nodes=1
-#SBATCH --output=outputs/logs/slurm-%j.out
-#SBATCH --error=outputs/logs/slurm-%j.err
+#SBATCH --output=/cluster/work/konradj/breast_mri/outputs/logs/slurm-%j.out
+#SBATCH --error=/cluster/work/konradj/breast_mri/outputs/logs/slurm-%j.err
 #SBATCH --mail-user=konradj@ntnu.no   # TODO: update
 #SBATCH --mail-type=ALL
 
@@ -29,10 +29,12 @@ conda activate breast_mri
 # Verify GPU is available
 python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}, Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 
+# Create output directories
+mkdir -p /cluster/work/konradj/breast_mri/outputs/logs
+mkdir -p /cluster/work/konradj/breast_mri/outputs/checkpoints
+
 # Run training
-python scripts/train.py --config configs/default.yaml \
-    data.num_workers=8 \
-    training.mixed_precision=true
+python scripts/train.py --config configs/idun.yaml
 
 echo "========================================="
 echo "Finished:  $(date)"
