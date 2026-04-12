@@ -109,11 +109,11 @@ pip install monai nibabel scikit-learn scipy pyyaml tqdm matplotlib
 ### 3. Clone the repo
 
 ```bash
-cd /cluster/work/konradj/
-git clone <your-repo-url> breast_mri
+cd /cluster/home/konradj/
+git clone <your-repo-url> ComputerVision
 ```
 
-That's it. The data is already on IDUN (read-only, shared across the course) and `configs/idun.yaml` points to it.
+That's it. The data is already on IDUN (read-only, shared across the course) and `configs/idun.yaml` points to it. Outputs are written to `/cluster/work/konradj/breast_mri/` to avoid filling home quota.
 
 ## Data
 
@@ -140,10 +140,10 @@ The ODELIA2025 dataset is at:
 
 ## Running on IDUN
 
-All commands below are run from your repo directory on IDUN:
+All commands below are run from the repo directory on IDUN:
 
 ```bash
-cd /cluster/work/konradj/breast_mri
+cd /cluster/home/konradj/ComputerVision
 ```
 
 ### Step 1: Train
