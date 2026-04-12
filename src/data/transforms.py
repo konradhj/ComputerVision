@@ -17,11 +17,31 @@ from monai.transforms import (
     NormalizeIntensityd,
     RandAffined,
     RandFlipd,
+    RandGaussianNoised,
     RandRotate90d,
     RandScaleIntensityd,
     RandShiftIntensityd,
     Resized,
+    ScaleIntensityRangePercentilesd,
 )
+
+
+def _get_normalization(sequences: List[str], use_percentile: bool = False):
+    """Get normalization transform — percentile-based (robust) or z-score."""
+    if use_percentile:
+        # Percentile normalization: clips 1st-99th percentile to [0,1]
+        # More robust to scanner differences across institutions
+        return ScaleIntensityRangePercentilesd(
+            keys=sequences,
+            lower=1,
+            upper=99,
+            b_min=0.0,
+            b_max=1.0,
+            clip=True,
+        )
+    else:
+        # Z-score normalization (original approach)
+        return NormalizeIntensityd(keys=sequences, nonzero=True, channel_wise=True)
 
 
 def get_train_transforms(
@@ -34,15 +54,18 @@ def get_train_transforms(
     rand_affine_scale_range: List[float] = None,
     rand_intensity_shift: float = 0.1,
     rand_intensity_scale: float = 0.1,
+    use_percentile_norm: bool = False,
+    rand_gaussian_noise_prob: float = 0.0,
+    rand_gaussian_noise_std: float = 0.05,
 ) -> Compose:
     """
     Training transform pipeline with augmentation.
 
     Flow:
-        1. Load each sequence NIfTI → separate arrays
+        1. Load each sequence NIfTI -> separate arrays
         2. Ensure channel-first: each becomes [1, D, H, W]
-        3. Normalize intensity per sequence (z-score, ignoring zeros)
-        4. Concatenate → single "image" tensor [C, D, H, W]
+        3. Normalize intensity per sequence
+        4. Concatenate -> single "image" tensor [C, D, H, W]
         5. Resize to target spatial size
         6. Random augmentations
         7. Ensure output types
@@ -53,7 +76,7 @@ def get_train_transforms(
     # Scale range for MONAI: specified as (min_offset, max_offset) from 1.0
     scale_offset = (rand_affine_scale_range[0] - 1.0, rand_affine_scale_range[1] - 1.0)
 
-    return Compose([
+    transforms = [
         # 1. Load NIfTI files
         LoadImaged(keys=sequences, image_only=True),
 
@@ -61,9 +84,9 @@ def get_train_transforms(
         EnsureChannelFirstd(keys=sequences),
 
         # 3. Per-sequence intensity normalization
-        NormalizeIntensityd(keys=sequences, nonzero=True, channel_wise=True),
+        _get_normalization(sequences, use_percentile=use_percentile_norm),
 
-        # 4. Concatenate sequences → "image" with C channels
+        # 4. Concatenate sequences -> "image" with C channels
         ConcatItemsd(keys=sequences, name="image", dim=0),
 
         # 5. Resize to target spatial size
@@ -83,15 +106,24 @@ def get_train_transforms(
         ),
         RandScaleIntensityd(keys=["image"], factors=rand_intensity_scale, prob=0.5),
         RandShiftIntensityd(keys=["image"], offsets=rand_intensity_shift, prob=0.5),
+    ]
 
-        # 7. Ensure correct tensor type
-        EnsureTyped(keys=["image"]),
-    ])
+    # Optional Gaussian noise (simulates scanner noise differences)
+    if rand_gaussian_noise_prob > 0:
+        transforms.append(
+            RandGaussianNoised(keys=["image"], prob=rand_gaussian_noise_prob, std=rand_gaussian_noise_std)
+        )
+
+    # 7. Ensure correct tensor type
+    transforms.append(EnsureTyped(keys=["image"]))
+
+    return Compose(transforms)
 
 
 def get_val_transforms(
     sequences: List[str],
     spatial_size: Tuple[int, int, int],
+    use_percentile_norm: bool = False,
 ) -> Compose:
     """
     Validation/test transform pipeline (no augmentation).
@@ -102,7 +134,7 @@ def get_val_transforms(
     return Compose([
         LoadImaged(keys=sequences, image_only=True),
         EnsureChannelFirstd(keys=sequences),
-        NormalizeIntensityd(keys=sequences, nonzero=True, channel_wise=True),
+        _get_normalization(sequences, use_percentile=use_percentile_norm),
         ConcatItemsd(keys=sequences, name="image", dim=0),
         Resized(keys=["image"], spatial_size=spatial_size, mode="trilinear"),
         EnsureTyped(keys=["image"]),

@@ -17,6 +17,7 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
+from sklearn.preprocessing import label_binarize
 
 logger = logging.getLogger("breast_mri")
 
@@ -79,30 +80,44 @@ def compute_metrics(
     }
     results["macro_f1"] = report["macro avg"]["f1-score"]
 
-    # 4. Malignant-vs-rest AUROC
+    # 4. Malignant-vs-rest AUROC (our metric)
     binary_labels = (labels == 2).astype(int)  # 1 = malignant, 0 = rest
     malignant_probs = probs[:, 2]              # P(malignant)
 
     if len(np.unique(binary_labels)) > 1:
         results["malignant_auroc"] = float(roc_auc_score(binary_labels, malignant_probs))
-
-        # ROC curve for threshold-based metrics
-        fpr, tpr, thresholds = roc_curve(binary_labels, malignant_probs)
-
-        # 5. Specificity at target sensitivity
-        results["specificity_at_sensitivity"] = _specificity_at_sensitivity(
-            fpr, tpr, sensitivity_threshold
-        )
-
-        # 6. Sensitivity at target specificity
-        results["sensitivity_at_specificity"] = _sensitivity_at_specificity(
-            fpr, tpr, specificity_threshold
-        )
     else:
-        logger.warning("Only one class present in labels — skipping AUROC and threshold metrics")
         results["malignant_auroc"] = None
-        results["specificity_at_sensitivity"] = None
+
+    # 5. Micro-averaged AUC — THIS IS THE LEADERBOARD METRIC
+    # Matches the evaluator: label_binarize + roc_auc_score(average="micro")
+    if len(np.unique(labels)) > 1:
+        y_bin = label_binarize(labels.astype(int), classes=[0, 1, 2])  # [N, 3]
+        results["micro_auc"] = float(roc_auc_score(y_bin, probs, average="micro"))
+
+        # Micro-averaged ROC curve for threshold metrics (matches evaluator)
+        fpr, tpr, thresholds = roc_curve(y_bin.ravel(), probs.ravel(), drop_intermediate=False)
+
+        # 6. Sensitivity at 90% specificity (on micro-averaged curve)
+        fpr_threshold = 1.0 - specificity_threshold
+        results["sensitivity_at_specificity"] = float(np.interp(fpr_threshold, fpr, tpr))
+
+        # 7. Specificity at 90% sensitivity (on micro-averaged curve)
+        fpr_at_sens = float(np.interp(sensitivity_threshold, tpr, fpr))
+        results["specificity_at_sensitivity"] = float(1.0 - fpr_at_sens)
+
+        # 8. Aggregate score (leaderboard ranking metric)
+        results["aggregate_score"] = float(np.mean([
+            results["micro_auc"],
+            results["specificity_at_sensitivity"],
+            results["sensitivity_at_specificity"],
+        ]))
+    else:
+        logger.warning("Only one class present in labels — skipping AUC and threshold metrics")
+        results["micro_auc"] = None
         results["sensitivity_at_specificity"] = None
+        results["specificity_at_sensitivity"] = None
+        results["aggregate_score"] = None
 
     return results
 
@@ -178,14 +193,16 @@ def print_metrics_report(metrics: Dict[str, Any]) -> None:
 
     print(f"\nAccuracy: {metrics['accuracy']:.4f}")
 
+    # Leaderboard metrics
+    if metrics.get("micro_auc") is not None:
+        print(f"\n--- Leaderboard Metrics ---")
+        print(f"AUC (micro-averaged): {metrics['micro_auc']:.4f}")
+        print(f"Sensitivity @ 90% specificity: {metrics.get('sensitivity_at_specificity', 0):.4f}")
+        print(f"Specificity @ 90% sensitivity: {metrics.get('specificity_at_sensitivity', 0):.4f}")
+        print(f"Aggregate Score: {metrics.get('aggregate_score', 0):.4f}")
+
     if metrics.get("malignant_auroc") is not None:
-        print(f"Malignant-vs-rest AUROC: {metrics['malignant_auroc']:.4f}")
-
-    if metrics.get("specificity_at_sensitivity") is not None:
-        print(f"Specificity @ 90% sensitivity: {metrics['specificity_at_sensitivity']:.4f}")
-
-    if metrics.get("sensitivity_at_specificity") is not None:
-        print(f"Sensitivity @ 90% specificity: {metrics['sensitivity_at_specificity']:.4f}")
+        print(f"\nMalignant-vs-rest AUROC: {metrics['malignant_auroc']:.4f}")
 
     print(f"\nMacro F1: {metrics['macro_f1']:.4f}")
 

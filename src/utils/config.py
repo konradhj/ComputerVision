@@ -53,6 +53,9 @@ class AugmentationConfig:
     rand_affine_scale_range: List[float] = field(default_factory=lambda: [0.9, 1.1])
     rand_intensity_shift: float = 0.1
     rand_intensity_scale: float = 0.1
+    use_percentile_norm: bool = False
+    rand_gaussian_noise_prob: float = 0.0
+    rand_gaussian_noise_std: float = 0.05
 
 
 @dataclass

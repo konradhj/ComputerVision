@@ -110,8 +110,9 @@ def main():
     samples = get_rsh_samples(cfg.data.root_dir, cfg.data.sequences)
     logger.info(f"Found {len(samples)} {args.institution} samples with all sequences")
 
-    # Build dataloader
-    transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size)
+    # Build dataloader (use same normalization as training)
+    use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
+    transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size, use_percentile_norm=use_pct)
     dataset = BreastMRIDataset(samples, transforms)
     dataloader = torch.utils.data.DataLoader(
         dataset,

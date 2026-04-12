@@ -81,8 +81,9 @@ def build_sample_list(
     df = pd.read_csv(split_csv)
 
     # Filter by fold and split
+    # fold=-1 means use all folds (maximizes training data)
     mask = (df["Split"] == split)
-    if "Fold" in df.columns:
+    if "Fold" in df.columns and fold >= 0:
         mask = mask & (df["Fold"] == fold)
     df_split = df[mask].reset_index(drop=True)
 
@@ -183,6 +184,10 @@ def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader, Optional[Dat
         (train_loader, val_loader, test_loader_or_None)
     """
     # Build transform pipelines
+    use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
+    noise_prob = getattr(cfg.augmentation, 'rand_gaussian_noise_prob', 0.0)
+    noise_std = getattr(cfg.augmentation, 'rand_gaussian_noise_std', 0.05)
+
     train_transforms = get_train_transforms(
         sequences=cfg.data.sequences,
         spatial_size=cfg.data.spatial_size,
@@ -193,10 +198,14 @@ def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader, Optional[Dat
         rand_affine_scale_range=cfg.augmentation.rand_affine_scale_range,
         rand_intensity_shift=cfg.augmentation.rand_intensity_shift,
         rand_intensity_scale=cfg.augmentation.rand_intensity_scale,
+        use_percentile_norm=use_pct,
+        rand_gaussian_noise_prob=noise_prob,
+        rand_gaussian_noise_std=noise_std,
     )
     val_transforms = get_val_transforms(
         sequences=cfg.data.sequences,
         spatial_size=cfg.data.spatial_size,
+        use_percentile_norm=use_pct,
     )
 
     # Build sample lists
