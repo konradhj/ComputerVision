@@ -46,3 +46,4 @@ slurm-*.err
 
 # Misc
 .env
+CLAUDE.md
