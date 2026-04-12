@@ -1,0 +1,65 @@
+# Breast MRI Classification — Default Configuration
+# Override any value via CLI: python scripts/train.py --config configs/default.yaml training.epochs=50
+
+# --- Data ---
+data:
+  root_dir: "data/"
+  split_csv: "split_unilateral.csv"
+  # Label source: CSV with either (UID, Lesion) or (studyID, Lesion_Left, Lesion_Right)
+  label_csv: "labels.csv"  # TODO: update to your actual label file path
+  sequences: ["Pre", "Post_1", "Post_2", "T2"]
+  spatial_size: [128, 128, 32]
+  fold: 0
+  num_workers: 4
+  batch_size: 4
+
+# --- Model ---
+model:
+  architecture: "densenet121"  # "densenet121", "resnet18", "resnet50"
+  in_channels: 4               # must match len(sequences)
+  num_classes: 3
+  dropout: 0.0
+  pretrained: false
+
+# --- Training ---
+training:
+  epochs: 100
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  optimizer: "adamw"
+  scheduler: "cosine"          # "cosine", "plateau", "step"
+  scheduler_patience: 10
+  early_stopping_patience: 15
+  mixed_precision: true
+  class_weights: null          # null = auto-compute from training set, or [w0, w1, w2]
+  label_smoothing: 0.0
+
+# --- Augmentation ---
+augmentation:
+  rand_flip_prob: 0.5
+  rand_rotate90_prob: 0.5
+  rand_affine_prob: 0.3
+  rand_affine_rotate_range: 0.1745   # ~10 degrees in radians
+  rand_affine_scale_range: [0.9, 1.1]
+  rand_intensity_shift: 0.1
+  rand_intensity_scale: 0.1
+
+# --- Calibration ---
+calibration:
+  enabled: false
+  temperature_init: 1.5
+
+# --- Evaluation ---
+evaluation:
+  sensitivity_threshold: 0.9
+  specificity_threshold: 0.9
+
+# --- Paths ---
+paths:
+  output_dir: "outputs/"
+  checkpoint_dir: "outputs/checkpoints/"
+  log_dir: "outputs/logs/"
+
+# --- Reproducibility ---
+seed: 42
+device: "auto"  # "auto", "cuda", "mps", "cpu"

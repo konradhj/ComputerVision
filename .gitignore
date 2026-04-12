@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project outputs
+outputs/
+submissions/
+*.pt
+*.pth
+
+# Data (large files — don't commit)
+data/
+*.nii
+*.nii.gz
+
+# Logs
+*.log
+wandb/
+
+# SLURM output files
+slurm-*.out
+slurm-*.err
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Misc
+.env
