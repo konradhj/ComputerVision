@@ -172,7 +172,7 @@ Training saves checkpoints to `/cluster/work/konradj/breast_mri/outputs/checkpoi
 Request an interactive GPU session, then run evaluation:
 
 ```bash
-srun --account=konradj --partition=GPUQ --gres=gpu:1 --mem=16G --cpus-per-task=4 --time=0-01:00:00 --pty bash
+srun --account=share-ie-idi --partition=GPUQ --gres=gpu:1 --mem=16G --cpus-per-task=4 --time=0-01:00:00 --pty bash
 
 # Inside the interactive session:
 module purge
@@ -204,7 +204,7 @@ This produces bilateral JSON files in `/cluster/work/konradj/breast_mri/submissi
 Request an interactive session with more time:
 
 ```bash
-srun --account=konradj --partition=GPUQ --gres=gpu:1 --mem=32G --cpus-per-task=8 --time=0-06:00:00 --pty bash
+srun --account=share-ie-idi --partition=GPUQ --gres=gpu:1 --mem=32G --cpus-per-task=8 --time=0-06:00:00 --pty bash
 
 module purge
 module load Anaconda3/2023.09-0

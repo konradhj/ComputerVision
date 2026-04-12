@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --account=konradj            # TODO: update to your account (e.g. ie-idi, ie-ite)
+#SBATCH --account=share-ie-idi            # TODO: update to your account (e.g. ie-idi, ie-ite)
 #SBATCH --job-name=breast_mri_train
 #SBATCH --time=0-08:00:00           # 8 hours — adjust based on dataset size
 #SBATCH --partition=GPUQ

@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --account=konradj
+#SBATCH --account=share-ie-idi
 #SBATCH --job-name=breast_mri_cal
 #SBATCH --time=0-00:30:00           # 30 minutes
 #SBATCH --partition=GPUQ

@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --account=konradj
+#SBATCH --account=share-ie-idi
 #SBATCH --job-name=breast_mri_infer
 #SBATCH --time=0-01:00:00           # 1 hour is plenty for inference
 #SBATCH --partition=GPUQ
