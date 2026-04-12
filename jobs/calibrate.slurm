@@ -17,8 +17,8 @@ module purge
 module load Anaconda3/2023.09-0
 conda activate breast_mri
 
-# Fit temperature scaling
-python scripts/calibrate.py --config configs/idun.yaml \
-    --checkpoint /cluster/work/konradj/breast_mri/outputs/checkpoints/best.pt
+# Fit temperature scaling on v2 (best model)
+python scripts/calibrate.py --config configs/idun_v2.yaml \
+    --checkpoint /cluster/work/konradj/breast_mri/outputs_v2/checkpoints/best.pt
 
 echo "Calibration complete: $(date)"

@@ -20,8 +20,9 @@ module load Anaconda3/2023.09-0
 conda activate breast_mri
 
 # Run inference to generate bilateral JSON submissions
-python scripts/inference.py --config configs/idun.yaml \
-    --checkpoint /cluster/work/konradj/breast_mri/outputs/checkpoints/best.pt \
+# Using v2 model (best AUROC)
+python scripts/inference.py --config configs/idun_v2.yaml \
+    --checkpoint /cluster/work/konradj/breast_mri/outputs_v2/checkpoints/best.pt \
     --output_dir /cluster/work/konradj/breast_mri/submissions/
 
 echo "Inference complete: $(date)"
