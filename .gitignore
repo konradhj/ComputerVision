@@ -28,7 +28,7 @@ submissions/
 *.pth
 
 # Data (large files — don't commit)
-data/
+/data/
 *.nii
 *.nii.gz
 

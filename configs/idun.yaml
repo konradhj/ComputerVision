@@ -3,9 +3,13 @@
 
 # --- Data ---
 data:
-  root_dir: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/"
-  split_csv: "split_unilateral.csv"   # TODO: confirm location — may be inside the data root
-  label_csv: "labels.csv"             # TODO: confirm location and filename
+  # Data root: contains institution folders (CAM, MHA, RSH, RUMC, UKA)
+  # Each has: data_unilateral/<UID>/ and metadata_unilateral/annotation.csv
+  root_dir: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/data/"
+  split_csv: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/split_unilateral.csv"
+  # "auto" = load labels from per-institution annotation CSVs automatically
+  # RSH has no annotations (hidden for leaderboard) — those samples get no label
+  label_csv: "auto"
   sequences: ["Pre", "Post_1", "Post_2", "T2"]
   spatial_size: [128, 128, 32]
   fold: 0
