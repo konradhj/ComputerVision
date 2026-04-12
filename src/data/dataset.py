@@ -122,13 +122,14 @@ def build_sample_list(
 
         if not all_exist:
             missing_paths += 1
-            # Still add the sample — MONAI LoadImaged will give a clear error
-            # This lets us see all missing files at once rather than one at a time
+            continue  # Skip samples with missing sequence files
 
         # Get label
         label = labels.get(uid, None)
         if label is None and labels:
             missing_labels += 1
+            if split in ("train", "val"):
+                continue  # Skip unlabeled samples for training/validation
 
         samples.append(SampleInfo(
             uid=uid,
@@ -137,10 +138,12 @@ def build_sample_list(
             institution=institution,
         ))
 
+    total_in_csv = len(df_split)
     if missing_paths > 0:
-        logger.warning(f"{missing_paths}/{len(samples)} samples have missing sequence files")
+        logger.warning(f"Skipped {missing_paths}/{total_in_csv} samples with missing sequence files")
     if missing_labels > 0 and labels:
-        logger.warning(f"{missing_labels}/{len(samples)} samples have no label in {label_csv}")
+        logger.warning(f"Skipped {missing_labels}/{total_in_csv} unlabeled samples (split={split})")
+    logger.info(f"Using {len(samples)}/{total_in_csv} samples for split='{split}'")
 
     return samples
 
