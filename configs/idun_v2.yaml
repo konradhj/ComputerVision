@@ -1,0 +1,65 @@
+# IDUN v2 — Reduce overfitting on small dataset (192 train samples)
+# Changes from v1: ResNet18, label smoothing, stronger augmentation, lower LR
+# Usage: python scripts/train.py --config configs/idun_v2.yaml
+
+# --- Data ---
+data:
+  root_dir: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/data/"
+  split_csv: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/split_unilateral.csv"
+  label_csv: "auto"
+  sequences: ["Pre", "Post_1", "Post_2", "T2"]
+  spatial_size: [128, 128, 32]
+  fold: 0
+  num_workers: 8
+  batch_size: 4
+
+# --- Model ---
+model:
+  architecture: "resnet18"          # Changed: 11M → ~3M params, less overfitting
+  in_channels: 4
+  num_classes: 3
+  dropout: 0.0
+  pretrained: false
+
+# --- Training ---
+training:
+  epochs: 100
+  learning_rate: 5.0e-5             # Changed: halved to slow down overfitting
+  weight_decay: 1.0e-4              # Changed: 10x stronger regularization
+  optimizer: "adamw"
+  scheduler: "cosine"
+  scheduler_patience: 10
+  early_stopping_patience: 20       # Changed: more patience (small dataset is noisy)
+  mixed_precision: true
+  class_weights: null
+  label_smoothing: 0.1              # Changed: helps with small/imbalanced classes
+
+# --- Augmentation (stronger) ---
+augmentation:
+  rand_flip_prob: 0.5
+  rand_rotate90_prob: 0.5
+  rand_affine_prob: 0.5             # Changed: more frequent affine transforms
+  rand_affine_rotate_range: 0.2618  # Changed: ~15 degrees (was ~10)
+  rand_affine_scale_range: [0.85, 1.15]  # Changed: wider scale range
+  rand_intensity_shift: 0.15        # Changed: stronger intensity augmentation
+  rand_intensity_scale: 0.15        # Changed: stronger intensity augmentation
+
+# --- Calibration ---
+calibration:
+  enabled: false
+  temperature_init: 1.5
+
+# --- Evaluation ---
+evaluation:
+  sensitivity_threshold: 0.9
+  specificity_threshold: 0.9
+
+# --- Paths ---
+paths:
+  output_dir: "/cluster/work/konradj/breast_mri/outputs_v2/"
+  checkpoint_dir: "/cluster/work/konradj/breast_mri/outputs_v2/checkpoints/"
+  log_dir: "/cluster/work/konradj/breast_mri/outputs_v2/logs/"
+
+# --- Reproducibility ---
+seed: 42
+device: "auto"
