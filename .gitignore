@@ -33,6 +33,7 @@ submissions/
 *.nii.gz
 
 # Logs
+logs/
 *.log
 wandb/
 

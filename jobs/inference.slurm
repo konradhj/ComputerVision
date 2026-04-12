@@ -7,12 +7,13 @@
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
-#SBATCH --output=/cluster/work/konradj/breast_mri/outputs/logs/slurm-infer-%j.out
-#SBATCH --error=/cluster/work/konradj/breast_mri/outputs/logs/slurm-infer-%j.err
+#SBATCH --output=logs/slurm-infer-%j.out
+#SBATCH --error=logs/slurm-infer-%j.err
 #SBATCH --mail-user=konradj@ntnu.no
 #SBATCH --mail-type=ALL
 
 cd ${SLURM_SUBMIT_DIR}
+mkdir -p logs
 
 module purge
 module load Anaconda3/2023.09-0
