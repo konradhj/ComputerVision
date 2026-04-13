@@ -17,11 +17,10 @@ module purge
 module load Anaconda3/2023.09-0
 conda activate breast_mri
 
-# Generate predictions CSV for RSH (leaderboard submission)
+# Generate predictions CSV for RSH using v4 model
 python scripts/generate_submission.py \
-    --config configs/idun_v2.yaml \
-    --checkpoint /cluster/work/konradj/breast_mri/outputs_v2/checkpoints/best.pt \
-    --temperature /cluster/work/konradj/breast_mri/outputs_v2/calibration/temperature.pt \
+    --config configs/idun_v4.yaml \
+    --checkpoint /cluster/work/konradj/breast_mri/outputs_v4/checkpoints/best.pt \
     --output /cluster/work/konradj/breast_mri/predictions.csv
 
 echo "Submission generated: $(date)"
