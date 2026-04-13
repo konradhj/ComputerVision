@@ -1,0 +1,69 @@
+# IDUN v5 — Add subtraction image (Sub_1) as 5th input channel
+# Research insight: DCE subtraction (Post-Pre) highlights contrast enhancement,
+# the key clinical feature for malignancy detection
+# Usage: python scripts/train.py --config configs/idun_v5.yaml
+
+# --- Data ---
+data:
+  root_dir: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/data/"
+  split_csv: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/split_unilateral.csv"
+  label_csv: "auto"
+  sequences: ["Pre", "Post_1", "Post_2", "T2", "Sub_1"]  # Added Sub_1 (=Post_1-Pre)
+  spatial_size: [128, 128, 32]
+  fold: -1
+  num_workers: 8
+  batch_size: 4
+
+# --- Model ---
+model:
+  architecture: "densenet121"
+  in_channels: 5                    # 5 channels now (auto-adjusted by load_config)
+  num_classes: 3
+  dropout: 0.3
+  pretrained: false
+
+# --- Training ---
+training:
+  epochs: 100
+  learning_rate: 5.0e-5
+  weight_decay: 1.0e-4
+  optimizer: "adamw"
+  scheduler: "cosine"
+  scheduler_patience: 10
+  early_stopping_patience: 30
+  mixed_precision: true
+  class_weights: null
+  label_smoothing: 0.1
+
+# --- Augmentation ---
+augmentation:
+  rand_flip_prob: 0.5
+  rand_rotate90_prob: 0.5
+  rand_affine_prob: 0.5
+  rand_affine_rotate_range: 0.2618
+  rand_affine_scale_range: [0.85, 1.15]
+  rand_intensity_shift: 0.25
+  rand_intensity_scale: 0.25
+  use_percentile_norm: true
+  rand_gaussian_noise_prob: 0.3
+  rand_gaussian_noise_std: 0.05
+
+# --- Calibration ---
+calibration:
+  enabled: false
+  temperature_init: 1.5
+
+# --- Evaluation ---
+evaluation:
+  sensitivity_threshold: 0.9
+  specificity_threshold: 0.9
+
+# --- Paths ---
+paths:
+  output_dir: "/cluster/work/konradj/breast_mri/outputs_v5/"
+  checkpoint_dir: "/cluster/work/konradj/breast_mri/outputs_v5/checkpoints/"
+  log_dir: "/cluster/work/konradj/breast_mri/outputs_v5/logs/"
+
+# --- Reproducibility ---
+seed: 42
+device: "auto"

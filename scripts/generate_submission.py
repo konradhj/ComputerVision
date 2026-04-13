@@ -2,19 +2,21 @@
 """
 Generate predictions.csv for leaderboard submission.
 
-Runs inference on RSH samples (or any specified institution) and outputs
-a CSV with columns: ID, normal, benign, malignant
+Runs inference on RSH samples and outputs a CSV with columns: ID, normal, benign, malignant.
+Supports test-time augmentation (TTA) for more robust predictions.
 
 Usage:
-    python scripts/generate_submission.py --config configs/idun_v2.yaml \
-        --checkpoint /path/to/best.pt \
-        --output predictions.csv
+    python scripts/generate_submission.py --config configs/idun_v5.yaml \
+        --checkpoint /path/to/best.pt --output predictions.csv
+
+    With TTA (8 augmented passes):
+    python scripts/generate_submission.py --config configs/idun_v5.yaml \
+        --checkpoint /path/to/best.pt --output predictions.csv --tta 8
 
     With temperature scaling:
-    python scripts/generate_submission.py --config configs/idun_v2.yaml \
-        --checkpoint /path/to/best.pt \
-        --temperature /path/to/temperature.pt \
-        --output predictions.csv
+    python scripts/generate_submission.py --config configs/idun_v5.yaml \
+        --checkpoint /path/to/best.pt --temperature /path/to/temperature.pt \
+        --output predictions.csv --tta 8
 """
 
 import argparse
@@ -29,8 +31,8 @@ from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.data.dataset import BreastMRIDataset, SampleInfo, _resolve_data_path
-from src.data.transforms import get_val_transforms
+from src.data.dataset import BreastMRIDataset, SampleInfo
+from src.data.transforms import get_train_transforms, get_val_transforms
 from src.models.classifier import load_model_checkpoint
 from src.utils.config import load_config
 from src.utils.logging_utils import setup_logging
@@ -49,7 +51,6 @@ def get_rsh_samples(data_root: str, sequences: list) -> list:
             continue
         uid = uid_dir.name
 
-        # Check all sequences exist
         image_paths = {}
         all_exist = True
         for seq in sequences:
@@ -88,14 +89,69 @@ def predict_all(model, dataloader, device, amp_enabled=False):
     return np.concatenate(all_logits), all_uids
 
 
+@torch.no_grad()
+def predict_with_tta(model, samples, cfg, device, n_tta=8):
+    """
+    Test-Time Augmentation: run N forward passes with random augmentations,
+    average the logits for more robust predictions.
+    """
+    model.eval()
+    amp_enabled = cfg.training.mixed_precision and device.type == "cuda"
+    amp_dtype = "cuda" if device.type == "cuda" else "cpu"
+    use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
+
+    # First pass: no augmentation (deterministic)
+    val_transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size, use_percentile_norm=use_pct)
+    dataset = BreastMRIDataset(samples, val_transforms)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=cfg.data.batch_size, shuffle=False,
+        num_workers=cfg.data.num_workers, pin_memory=True,
+    )
+    logits_base, uids = predict_all(model, dataloader, device, amp_enabled)
+    all_logits = [logits_base]
+
+    # Augmented passes
+    noise_prob = getattr(cfg.augmentation, 'rand_gaussian_noise_prob', 0.0)
+    noise_std = getattr(cfg.augmentation, 'rand_gaussian_noise_std', 0.05)
+
+    for i in range(n_tta - 1):
+        print(f"TTA pass {i+2}/{n_tta}")
+        tta_transforms = get_train_transforms(
+            sequences=cfg.data.sequences,
+            spatial_size=cfg.data.spatial_size,
+            rand_flip_prob=0.5,
+            rand_rotate90_prob=0.5,
+            rand_affine_prob=0.0,       # Skip affine for TTA (too aggressive)
+            rand_affine_rotate_range=0.0,
+            rand_affine_scale_range=[1.0, 1.0],
+            rand_intensity_shift=0.05,  # Mild intensity augmentation
+            rand_intensity_scale=0.05,
+            use_percentile_norm=use_pct,
+            rand_gaussian_noise_prob=0.0,
+            rand_gaussian_noise_std=0.0,
+        )
+        dataset = BreastMRIDataset(samples, tta_transforms)
+        dataloader = torch.utils.data.DataLoader(
+            dataset, batch_size=cfg.data.batch_size, shuffle=False,
+            num_workers=cfg.data.num_workers, pin_memory=True,
+        )
+        logits_aug, _ = predict_all(model, dataloader, device, amp_enabled)
+        all_logits.append(logits_aug)
+
+    # Average logits across all passes
+    avg_logits = np.mean(all_logits, axis=0)
+    print(f"TTA complete: averaged {n_tta} passes")
+    return avg_logits, uids
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate submission CSV")
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--temperature", type=str, default=None)
     parser.add_argument("--output", type=str, default="predictions.csv")
-    parser.add_argument("--institution", type=str, default="RSH",
-                        help="Which institution to predict on")
+    parser.add_argument("--tta", type=int, default=0,
+                        help="Number of TTA passes (0=disabled, 8=recommended)")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -108,23 +164,22 @@ def main():
 
     # Get RSH samples directly from disk
     samples = get_rsh_samples(cfg.data.root_dir, cfg.data.sequences)
-    logger.info(f"Found {len(samples)} {args.institution} samples with all sequences")
+    logger.info(f"Found {len(samples)} RSH samples with all sequences")
 
-    # Build dataloader (use same normalization as training)
-    use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
-    transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size, use_percentile_norm=use_pct)
-    dataset = BreastMRIDataset(samples, transforms)
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=cfg.data.batch_size,
-        shuffle=False,
-        num_workers=cfg.data.num_workers,
-        pin_memory=True,
-    )
-
-    # Run inference
-    amp_enabled = cfg.training.mixed_precision and device.type == "cuda"
-    logits, uids = predict_all(model, dataloader, device, amp_enabled)
+    # Run inference (with or without TTA)
+    if args.tta > 1:
+        logger.info(f"Running inference with TTA ({args.tta} passes)")
+        logits, uids = predict_with_tta(model, samples, cfg, device, n_tta=args.tta)
+    else:
+        use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
+        transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size, use_percentile_norm=use_pct)
+        dataset = BreastMRIDataset(samples, transforms)
+        dataloader = torch.utils.data.DataLoader(
+            dataset, batch_size=cfg.data.batch_size, shuffle=False,
+            num_workers=cfg.data.num_workers, pin_memory=True,
+        )
+        amp_enabled = cfg.training.mixed_precision and device.type == "cuda"
+        logits, uids = predict_all(model, dataloader, device, amp_enabled)
 
     # Optional temperature scaling
     if args.temperature is not None:
