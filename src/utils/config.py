@@ -42,6 +42,8 @@ class TrainingConfig:
     mixed_precision: bool = True
     class_weights: Optional[List[float]] = None
     label_smoothing: float = 0.0
+    loss_type: str = "cross_entropy"  # "cross_entropy" or "focal"
+    focal_gamma: float = 2.0
 
 
 @dataclass

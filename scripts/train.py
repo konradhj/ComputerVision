@@ -105,10 +105,14 @@ def main():
     scheduler = build_scheduler(optimizer, cfg.training)
 
     # Build loss function
+    loss_type = getattr(cfg.training, 'loss_type', 'cross_entropy')
+    focal_gamma = getattr(cfg.training, 'focal_gamma', 2.0)
     criterion = get_loss_function(
         class_weights=class_weights,
         label_smoothing=cfg.training.label_smoothing,
         device=device,
+        loss_type=loss_type,
+        focal_gamma=focal_gamma,
     )
 
     # Train
