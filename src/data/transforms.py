@@ -138,12 +138,10 @@ def get_train_transforms(
     ]
 
     # 3. Compute derived channels (before normalization, from raw intensities)
+    # Derived channels inherit shape [1, D, H, W] from their source tensors
+    # (which already went through EnsureChannelFirstd), so no extra reshape needed
     if derive_sub2 or derive_washout:
         transforms.append(ComputeDerivedChannelsd(derive_sub2=derive_sub2, derive_washout=derive_washout))
-        # Ensure derived channels also have channel-first format
-        derived_keys = [k for k in all_keys if k not in sequences]
-        if derived_keys:
-            transforms.append(EnsureChannelFirstd(keys=derived_keys))
 
     transforms.extend([
         # 4. Per-sequence intensity normalization (on all channels)
@@ -201,9 +199,6 @@ def get_val_transforms(
 
     if derive_sub2 or derive_washout:
         transforms.append(ComputeDerivedChannelsd(derive_sub2=derive_sub2, derive_washout=derive_washout))
-        derived_keys = [k for k in all_keys if k not in sequences]
-        if derived_keys:
-            transforms.append(EnsureChannelFirstd(keys=derived_keys))
 
     transforms.extend([
         _get_normalization(all_keys, use_percentile=use_percentile_norm),
