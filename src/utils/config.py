@@ -56,6 +56,8 @@ class AugmentationConfig:
     use_percentile_norm: bool = False
     rand_gaussian_noise_prob: float = 0.0
     rand_gaussian_noise_std: float = 0.05
+    derive_sub2: bool = False
+    derive_washout: bool = False
 
 
 @dataclass
@@ -183,8 +185,13 @@ def load_config(yaml_path: str, overrides: Optional[List[str]] = None) -> Config
 
     config = _dict_to_config(cfg_dict)
 
-    # Ensure in_channels matches number of sequences
-    config.model.in_channels = len(config.data.sequences)
+    # Ensure in_channels matches number of sequences + derived channels
+    n_channels = len(config.data.sequences)
+    if config.augmentation.derive_sub2:
+        n_channels += 1
+    if config.augmentation.derive_washout:
+        n_channels += 1
+    config.model.in_channels = n_channels
 
     # Create output directories
     for dir_path in [config.paths.output_dir, config.paths.checkpoint_dir, config.paths.log_dir]:

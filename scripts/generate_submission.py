@@ -99,9 +99,13 @@ def predict_with_tta(model, samples, cfg, device, n_tta=8):
     amp_enabled = cfg.training.mixed_precision and device.type == "cuda"
     amp_dtype = "cuda" if device.type == "cuda" else "cpu"
     use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
+    derive_sub2 = getattr(cfg.augmentation, 'derive_sub2', False)
+    derive_washout = getattr(cfg.augmentation, 'derive_washout', False)
 
     # First pass: no augmentation (deterministic)
-    val_transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size, use_percentile_norm=use_pct)
+    val_transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size,
+                                        use_percentile_norm=use_pct,
+                                        derive_sub2=derive_sub2, derive_washout=derive_washout)
     dataset = BreastMRIDataset(samples, val_transforms)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=cfg.data.batch_size, shuffle=False,
@@ -172,7 +176,11 @@ def main():
         logits, uids = predict_with_tta(model, samples, cfg, device, n_tta=args.tta)
     else:
         use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
-        transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size, use_percentile_norm=use_pct)
+        d_sub2 = getattr(cfg.augmentation, 'derive_sub2', False)
+        d_wash = getattr(cfg.augmentation, 'derive_washout', False)
+        transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size,
+                                        use_percentile_norm=use_pct,
+                                        derive_sub2=d_sub2, derive_washout=d_wash)
         dataset = BreastMRIDataset(samples, transforms)
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=cfg.data.batch_size, shuffle=False,

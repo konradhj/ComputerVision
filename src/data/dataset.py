@@ -187,6 +187,8 @@ def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader, Optional[Dat
     use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
     noise_prob = getattr(cfg.augmentation, 'rand_gaussian_noise_prob', 0.0)
     noise_std = getattr(cfg.augmentation, 'rand_gaussian_noise_std', 0.05)
+    derive_sub2 = getattr(cfg.augmentation, 'derive_sub2', False)
+    derive_washout = getattr(cfg.augmentation, 'derive_washout', False)
 
     train_transforms = get_train_transforms(
         sequences=cfg.data.sequences,
@@ -201,11 +203,15 @@ def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader, Optional[Dat
         use_percentile_norm=use_pct,
         rand_gaussian_noise_prob=noise_prob,
         rand_gaussian_noise_std=noise_std,
+        derive_sub2=derive_sub2,
+        derive_washout=derive_washout,
     )
     val_transforms = get_val_transforms(
         sequences=cfg.data.sequences,
         spatial_size=cfg.data.spatial_size,
         use_percentile_norm=use_pct,
+        derive_sub2=derive_sub2,
+        derive_washout=derive_washout,
     )
 
     # Build sample lists
