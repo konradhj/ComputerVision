@@ -1,0 +1,73 @@
+# IDUN v11 — Full resolution (256x256x32) instead of downsampled 128x128x32
+# Hypothesis: small lesions may be invisible at 128x128, preserving full resolution
+# could dramatically improve sensitivity/specificity
+# Same channels and weights as v8 (our best leaderboard model)
+
+# --- Data ---
+data:
+  root_dir: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/data/"
+  split_csv: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/split_unilateral.csv"
+  label_csv: "auto"
+  sequences: ["Pre", "Sub_1", "T2"]
+  spatial_size: [256, 256, 32]        # Full resolution — no downsampling
+  fold: -1
+  num_workers: 8
+  batch_size: 2                       # Smaller batch for larger volumes
+
+# --- Model ---
+model:
+  architecture: "densenet121"
+  in_channels: 3
+  num_classes: 3
+  dropout: 0.3
+  pretrained: false
+
+# --- Training ---
+training:
+  epochs: 100
+  learning_rate: 5.0e-5
+  weight_decay: 1.0e-4
+  optimizer: "adamw"
+  scheduler: "cosine"
+  scheduler_patience: 10
+  early_stopping_patience: 30
+  mixed_precision: true
+  class_weights: [1.0, 2.0, 1.5]
+  label_smoothing: 0.1
+  loss_type: "cross_entropy"
+  focal_gamma: 2.0
+
+# --- Augmentation ---
+augmentation:
+  rand_flip_prob: 0.5
+  rand_rotate90_prob: 0.5
+  rand_affine_prob: 0.5
+  rand_affine_rotate_range: 0.2618
+  rand_affine_scale_range: [0.85, 1.15]
+  rand_intensity_shift: 0.25
+  rand_intensity_scale: 0.25
+  use_percentile_norm: true
+  rand_gaussian_noise_prob: 0.3
+  rand_gaussian_noise_std: 0.05
+  derive_sub2: false
+  derive_washout: false
+
+# --- Calibration ---
+calibration:
+  enabled: false
+  temperature_init: 1.5
+
+# --- Evaluation ---
+evaluation:
+  sensitivity_threshold: 0.9
+  specificity_threshold: 0.9
+
+# --- Paths ---
+paths:
+  output_dir: "/cluster/work/konradj/breast_mri/outputs_v11/"
+  checkpoint_dir: "/cluster/work/konradj/breast_mri/outputs_v11/checkpoints/"
+  log_dir: "/cluster/work/konradj/breast_mri/outputs_v11/logs/"
+
+# --- Reproducibility ---
+seed: 42
+device: "auto"
