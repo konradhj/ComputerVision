@@ -10,9 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 import torch
 from monai.data import DataLoader, Dataset
+from torch.utils.data import WeightedRandomSampler
 
 from ..utils.config import Config
 from .label_mapping import load_labels, load_labels_from_institutions
@@ -63,6 +65,8 @@ def build_sample_list(
     sequences: List[str],
     fold: int,
     split: str,
+    exclude_institution: Optional[str] = None,
+    only_institution: Optional[str] = None,
 ) -> List[SampleInfo]:
     """
     Build a list of SampleInfo from the split CSV and labels.
@@ -72,8 +76,10 @@ def build_sample_list(
         label_csv: Path to label CSV, or None for label-free inference.
         root_dir: Root directory containing the data.
         sequences: List of sequence names to load (e.g., ["Pre", "Post_1", "Post_2", "T2"]).
-        fold: Which fold to use.
+        fold: Which fold to use. -1 = use all folds.
         split: One of "train", "val", "test".
+        exclude_institution: If set, exclude this institution (for LOO validation).
+        only_institution: If set, only include this institution (for LOO validation).
 
     Returns:
         List of SampleInfo objects.
@@ -85,6 +91,15 @@ def build_sample_list(
     mask = (df["Split"] == split)
     if "Fold" in df.columns and fold >= 0:
         mask = mask & (df["Fold"] == fold)
+
+    # Institution filtering for leave-one-out validation
+    if exclude_institution and "Institution" in df.columns:
+        mask = mask & (df["Institution"] != exclude_institution)
+        logger.info(f"Excluding institution: {exclude_institution}")
+    if only_institution and "Institution" in df.columns:
+        mask = mask & (df["Institution"] == only_institution)
+        logger.info(f"Only institution: {only_institution}")
+
     df_split = df[mask].reset_index(drop=True)
 
     logger.info(f"Found {len(df_split)} samples for split='{split}', fold={fold}")
@@ -231,14 +246,31 @@ def build_dataloaders(cfg: Config) -> Tuple[DataLoader, DataLoader, Optional[Dat
     train_ds = BreastMRIDataset(train_samples, train_transforms)
     val_ds = BreastMRIDataset(val_samples, val_transforms)
 
-    train_loader = DataLoader(
-        train_ds,
-        batch_size=cfg.data.batch_size,
-        shuffle=True,
-        num_workers=cfg.data.num_workers,
-        pin_memory=True,
-        drop_last=True,
-    )
+    # Oversampling: balance classes by sampling minority classes more often
+    use_oversampling = getattr(cfg.training, 'oversample', False)
+    if use_oversampling:
+        train_labels = [s.label for s in train_samples]
+        class_counts = np.bincount(train_labels, minlength=3)
+        sample_weights = [1.0 / class_counts[label] for label in train_labels]
+        sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_labels), replacement=True)
+        logger.info(f"Oversampling enabled: class counts {class_counts.tolist()}")
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=cfg.data.batch_size,
+            sampler=sampler,  # sampler replaces shuffle
+            num_workers=cfg.data.num_workers,
+            pin_memory=True,
+            drop_last=True,
+        )
+    else:
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=cfg.data.batch_size,
+            shuffle=True,
+            num_workers=cfg.data.num_workers,
+            pin_memory=True,
+            drop_last=True,
+        )
     val_loader = DataLoader(
         val_ds,
         batch_size=cfg.data.batch_size,

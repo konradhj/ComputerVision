@@ -44,6 +44,7 @@ class TrainingConfig:
     label_smoothing: float = 0.0
     loss_type: str = "cross_entropy"  # "cross_entropy" or "focal"
     focal_gamma: float = 2.0
+    oversample: bool = False
 
 
 @dataclass
