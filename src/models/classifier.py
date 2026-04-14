@@ -143,6 +143,26 @@ class BreastClassifier(nn.Module):
         return self.backbone(x)
 
 
+def _convert_batchnorm_to_instancenorm(module: nn.Module) -> nn.Module:
+    """
+    Recursively replace all BatchNorm layers with InstanceNorm.
+
+    BatchNorm stores running mean/variance from training data — these statistics
+    are scanner-specific and cause domain shift on unseen institutions.
+    InstanceNorm computes statistics per-sample at test time — domain-invariant.
+    """
+    for name, child in module.named_children():
+        if isinstance(child, nn.BatchNorm3d):
+            setattr(module, name, nn.InstanceNorm3d(child.num_features, affine=True))
+        elif isinstance(child, nn.BatchNorm2d):
+            setattr(module, name, nn.InstanceNorm2d(child.num_features, affine=True))
+        elif isinstance(child, nn.BatchNorm1d):
+            setattr(module, name, nn.InstanceNorm1d(child.num_features, affine=True))
+        else:
+            _convert_batchnorm_to_instancenorm(child)
+    return module
+
+
 def build_model(cfg: ModelConfig, device: torch.device) -> nn.Module:
     """
     Build the classifier and move it to the specified device.
@@ -153,6 +173,13 @@ def build_model(cfg: ModelConfig, device: torch.device) -> nn.Module:
         model = SliceClassifier(cfg).to(device)
     else:
         model = BreastClassifier(cfg).to(device)
+
+    # Replace BatchNorm with InstanceNorm for domain-invariant features
+    use_instancenorm = getattr(cfg, 'use_instancenorm', False)
+    if use_instancenorm:
+        _convert_batchnorm_to_instancenorm(model)
+        model = model.to(device)
+        logger.info("  Converted BatchNorm → InstanceNorm (domain-invariant)")
 
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)

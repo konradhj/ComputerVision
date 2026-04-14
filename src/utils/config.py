@@ -28,6 +28,7 @@ class ModelConfig:
     num_classes: int = 3
     dropout: float = 0.0
     pretrained: bool = False
+    use_instancenorm: bool = False
 
 
 @dataclass
