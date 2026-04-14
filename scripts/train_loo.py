@@ -57,6 +57,9 @@ def train_one_loo(cfg, val_institution, device, logger):
     logger.info(f"LOO: Validate on {val_institution}, train on {[i for i in INSTITUTIONS if i != val_institution]}")
     logger.info(f"{'='*60}")
 
+    # LOO validation is noisier than same-distribution — need more patience
+    cfg.training.early_stopping_patience = 50
+
     # Override output paths for this LOO split
     loo_dir = Path(cfg.paths.output_dir) / f"loo_{val_institution}"
     loo_dir.mkdir(parents=True, exist_ok=True)
