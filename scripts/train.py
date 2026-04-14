@@ -29,19 +29,25 @@ from src.utils.reproducibility import get_device, seed_everything
 
 
 def build_optimizer(model: torch.nn.Module, cfg) -> torch.optim.Optimizer:
-    """Build optimizer from config."""
+    """Build optimizer from config. Uses lower LR for pretrained layers."""
+    # For pretrained models, use different LR for frozen vs trainable layers
+    from src.models.classifier import SliceClassifier
+    if isinstance(model, SliceClassifier):
+        pretrained_params = [p for p in model.features.parameters() if p.requires_grad]
+        new_params = list(model.classifier.parameters())
+        param_groups = [
+            {"params": pretrained_params, "lr": cfg.learning_rate * 0.1},  # 10x lower for pretrained
+            {"params": new_params, "lr": cfg.learning_rate},
+        ]
+    else:
+        param_groups = [{"params": model.parameters(), "lr": cfg.learning_rate}]
+
     if cfg.optimizer == "adamw":
-        return torch.optim.AdamW(
-            model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay
-        )
+        return torch.optim.AdamW(param_groups, weight_decay=cfg.weight_decay)
     elif cfg.optimizer == "adam":
-        return torch.optim.Adam(
-            model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay
-        )
+        return torch.optim.Adam(param_groups, weight_decay=cfg.weight_decay)
     elif cfg.optimizer == "sgd":
-        return torch.optim.SGD(
-            model.parameters(), lr=cfg.learning_rate, weight_decay=cfg.weight_decay, momentum=0.9
-        )
+        return torch.optim.SGD(param_groups, weight_decay=cfg.weight_decay, momentum=0.9)
     else:
         raise ValueError(f"Unknown optimizer: {cfg.optimizer}")
 
