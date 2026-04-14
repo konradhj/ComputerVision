@@ -1,7 +1,7 @@
 #!/bin/sh
 #SBATCH --account=share-ie-idi
 #SBATCH --job-name=breast_mri_v9
-#SBATCH --time=0-06:00:00
+#SBATCH --time=0-10:00:00           # Increased — v9 needs ~8h on P100
 #SBATCH --partition=GPUQ
 #SBATCH --gres=gpu:1
 #SBATCH --mem=32G

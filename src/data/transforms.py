@@ -140,13 +140,6 @@ def get_train_transforms(
         EnsureChannelFirstd(keys=sequences),
     ]
 
-    # 2b. Crop to foreground — removes air/background, focuses on breast tissue
-    # Uses first sequence (e.g., Pre) as reference for the bounding box
-    if crop_foreground:
-        transforms.append(
-            CropForegroundd(keys=sequences, source_key=sequences[0], margin=5)
-        )
-
     # 3. Compute derived channels (before normalization, from raw intensities)
     if derive_sub2 or derive_washout:
         transforms.append(ComputeDerivedChannelsd(derive_sub2=derive_sub2, derive_washout=derive_washout))
@@ -157,8 +150,17 @@ def get_train_transforms(
 
         # 5. Concatenate all channels -> "image"
         ConcatItemsd(keys=all_keys, name="image", dim=0),
+    ])
 
-        # 6. Resize to target spatial size
+    # 5b. Crop foreground on concatenated image — removes air/background
+    # Done after concat so all channels are cropped identically
+    if crop_foreground:
+        transforms.append(
+            CropForegroundd(keys=["image"], source_key="image", margin=5)
+        )
+
+    transforms.extend([
+        # 6. Resize to target spatial size (ensures uniform size after crop)
         Resized(keys=["image"], spatial_size=spatial_size, mode="trilinear"),
 
         # 7. Augmentation
@@ -206,17 +208,20 @@ def get_val_transforms(
         EnsureChannelFirstd(keys=sequences),
     ]
 
-    if crop_foreground:
-        transforms.append(
-            CropForegroundd(keys=sequences, source_key=sequences[0], margin=5)
-        )
-
     if derive_sub2 or derive_washout:
         transforms.append(ComputeDerivedChannelsd(derive_sub2=derive_sub2, derive_washout=derive_washout))
 
     transforms.extend([
         _get_normalization(all_keys, use_percentile=use_percentile_norm),
         ConcatItemsd(keys=all_keys, name="image", dim=0),
+    ])
+
+    if crop_foreground:
+        transforms.append(
+            CropForegroundd(keys=["image"], source_key="image", margin=5)
+        )
+
+    transforms.extend([
         Resized(keys=["image"], spatial_size=spatial_size, mode="trilinear"),
         EnsureTyped(keys=["image"]),
     ])
