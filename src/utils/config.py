@@ -60,6 +60,7 @@ class AugmentationConfig:
     rand_gaussian_noise_std: float = 0.05
     derive_sub2: bool = False
     derive_washout: bool = False
+    crop_foreground: bool = False
 
 
 @dataclass

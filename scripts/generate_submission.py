@@ -101,11 +101,13 @@ def predict_with_tta(model, samples, cfg, device, n_tta=8):
     use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
     derive_sub2 = getattr(cfg.augmentation, 'derive_sub2', False)
     derive_washout = getattr(cfg.augmentation, 'derive_washout', False)
+    crop_fg = getattr(cfg.augmentation, 'crop_foreground', False)
 
     # First pass: no augmentation (deterministic)
     val_transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size,
                                         use_percentile_norm=use_pct,
-                                        derive_sub2=derive_sub2, derive_washout=derive_washout)
+                                        derive_sub2=derive_sub2, derive_washout=derive_washout,
+                                        crop_foreground=crop_fg)
     dataset = BreastMRIDataset(samples, val_transforms)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=cfg.data.batch_size, shuffle=False,
@@ -178,9 +180,11 @@ def main():
         use_pct = getattr(cfg.augmentation, 'use_percentile_norm', False)
         d_sub2 = getattr(cfg.augmentation, 'derive_sub2', False)
         d_wash = getattr(cfg.augmentation, 'derive_washout', False)
+        crop_fg = getattr(cfg.augmentation, 'crop_foreground', False)
         transforms = get_val_transforms(cfg.data.sequences, cfg.data.spatial_size,
                                         use_percentile_norm=use_pct,
-                                        derive_sub2=d_sub2, derive_washout=d_wash)
+                                        derive_sub2=d_sub2, derive_washout=d_wash,
+                                        crop_foreground=crop_fg)
         dataset = BreastMRIDataset(samples, transforms)
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=cfg.data.batch_size, shuffle=False,

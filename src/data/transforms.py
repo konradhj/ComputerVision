@@ -17,6 +17,7 @@ from monai.config import KeysCollection
 from monai.transforms import (
     Compose,
     ConcatItemsd,
+    CropForegroundd,
     EnsureChannelFirstd,
     EnsureTyped,
     LoadImaged,
@@ -107,6 +108,7 @@ def get_train_transforms(
     rand_gaussian_noise_std: float = 0.05,
     derive_sub2: bool = False,
     derive_washout: bool = False,
+    crop_foreground: bool = False,
 ) -> Compose:
     """
     Training transform pipeline with augmentation.
@@ -114,6 +116,7 @@ def get_train_transforms(
     Flow:
         1. Load each sequence NIfTI -> separate arrays
         2. Ensure channel-first: each becomes [1, D, H, W]
+        2b. (Optional) Crop to foreground bounding box — removes background/air
         3. (Optional) Compute derived channels (Sub_2, Washout)
         4. Normalize intensity per sequence
         5. Concatenate -> single "image" tensor [C, D, H, W]
@@ -137,9 +140,14 @@ def get_train_transforms(
         EnsureChannelFirstd(keys=sequences),
     ]
 
+    # 2b. Crop to foreground — removes air/background, focuses on breast tissue
+    # Uses first sequence (e.g., Pre) as reference for the bounding box
+    if crop_foreground:
+        transforms.append(
+            CropForegroundd(keys=sequences, source_key=sequences[0], margin=5)
+        )
+
     # 3. Compute derived channels (before normalization, from raw intensities)
-    # Derived channels inherit shape [1, D, H, W] from their source tensors
-    # (which already went through EnsureChannelFirstd), so no extra reshape needed
     if derive_sub2 or derive_washout:
         transforms.append(ComputeDerivedChannelsd(derive_sub2=derive_sub2, derive_washout=derive_washout))
 
@@ -186,6 +194,7 @@ def get_val_transforms(
     use_percentile_norm: bool = False,
     derive_sub2: bool = False,
     derive_washout: bool = False,
+    crop_foreground: bool = False,
 ) -> Compose:
     """
     Validation/test transform pipeline (no augmentation).
@@ -196,6 +205,11 @@ def get_val_transforms(
         LoadImaged(keys=sequences, image_only=True),
         EnsureChannelFirstd(keys=sequences),
     ]
+
+    if crop_foreground:
+        transforms.append(
+            CropForegroundd(keys=sequences, source_key=sequences[0], margin=5)
+        )
 
     if derive_sub2 or derive_washout:
         transforms.append(ComputeDerivedChannelsd(derive_sub2=derive_sub2, derive_washout=derive_washout))
