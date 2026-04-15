@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --output=logs/slurm-subv16-%j.out
 #SBATCH --error=logs/slurm-subv16-%j.err
-#SBATCH --exclude=idun-11-02,idun-11-04,idun-11-06,idun-11-07,idun-11-08,idun-11-10,idun-11-13,idun-11-16,idun-11-19,idun-11-20
+#SBATCH --exclude=idun-11-[01-20]
 
 echo "Node: $SLURM_JOB_NODELIST"
 
