@@ -1,0 +1,76 @@
+# IDUN v18 — MedicalNet pretrained 3D ResNet50
+# Uses weights pretrained on diverse 3D medical imaging datasets (CT, MRI)
+# Fine-tuned for breast cancer classification
+# This gives us pretrained 3D features — unlike ImageNet (2D) or from scratch
+
+# --- Data ---
+data:
+  root_dir: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/data/"
+  split_csv: "/cluster/projects/vc/courses/TDT17/mic/ODELIA2025/split_unilateral.csv"
+  label_csv: "auto"
+  sequences: ["Sub_1"]
+  spatial_size: [224, 224, 32]
+  fold: -1
+  num_workers: 8
+  batch_size: 4
+
+# --- Model ---
+model:
+  architecture: "medicalnet_resnet50"
+  in_channels: 1
+  num_classes: 3
+  dropout: 0.3
+  pretrained: true
+  pretrain_path: "/cluster/work/konradj/breast_mri/pretrained/resnet_50_23dataset.pth"
+
+# --- Training ---
+training:
+  epochs: 100
+  learning_rate: 1.0e-4               # Higher LR — pretrained layers frozen
+  weight_decay: 1.0e-4
+  optimizer: "adamw"
+  scheduler: "cosine"
+  scheduler_patience: 10
+  early_stopping_patience: 25
+  mixed_precision: true
+  class_weights: [1.0, 1.0, 1.0]
+  label_smoothing: 0.05
+  loss_type: "cross_entropy"
+  focal_gamma: 2.0
+  oversample: true
+
+# --- Augmentation ---
+augmentation:
+  rand_flip_prob: 0.5
+  rand_rotate90_prob: 0.5
+  rand_affine_prob: 0.5
+  rand_affine_rotate_range: 0.2618
+  rand_affine_scale_range: [0.85, 1.15]
+  rand_intensity_shift: 0.25
+  rand_intensity_scale: 0.25
+  use_percentile_norm: false
+  rand_gaussian_noise_prob: 0.3
+  rand_gaussian_noise_std: 0.1
+  derive_sub2: false
+  derive_washout: false
+  crop_foreground: false
+
+# --- Calibration ---
+calibration:
+  enabled: false
+  temperature_init: 1.5
+
+# --- Evaluation ---
+evaluation:
+  sensitivity_threshold: 0.9
+  specificity_threshold: 0.9
+
+# --- Paths ---
+paths:
+  output_dir: "/cluster/work/konradj/breast_mri/outputs_v18/"
+  checkpoint_dir: "/cluster/work/konradj/breast_mri/outputs_v18/checkpoints/"
+  log_dir: "/cluster/work/konradj/breast_mri/outputs_v18/logs/"
+
+# --- Reproducibility ---
+seed: 42
+device: "auto"

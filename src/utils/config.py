@@ -29,6 +29,7 @@ class ModelConfig:
     dropout: float = 0.0
     pretrained: bool = False
     use_instancenorm: bool = False
+    pretrain_path: str = ""
 
 
 @dataclass

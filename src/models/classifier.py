@@ -169,7 +169,17 @@ def build_model(cfg: ModelConfig, device: torch.device) -> nn.Module:
 
     Logs the model architecture and parameter count.
     """
-    if cfg.architecture == "slice_resnet50":
+    if cfg.architecture == "medicalnet_resnet50":
+        from .medicalnet import build_medicalnet_resnet50
+        pretrain_path = getattr(cfg, 'pretrain_path', None)
+        model = build_medicalnet_resnet50(
+            num_classes=cfg.num_classes,
+            in_channels=cfg.in_channels,
+            dropout=cfg.dropout,
+            pretrain_path=pretrain_path,
+            device=device,
+        )
+    elif cfg.architecture == "slice_resnet50":
         model = SliceClassifier(cfg).to(device)
     else:
         model = BreastClassifier(cfg).to(device)
