@@ -5,7 +5,6 @@
 #SBATCH --partition=GPUQ
 #SBATCH --gres=gpu:1
 #SBATCH --mem=48G
-#SBATCH --constraint="V100|A100|H100|A40"
 #SBATCH --cpus-per-task=4
 #SBATCH --nodes=1
 #SBATCH --output=logs/slurm-subv16-%j.out
