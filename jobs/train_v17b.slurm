@@ -17,5 +17,6 @@ echo "Node: $SLURM_JOB_NODELIST"
 cd ${SLURM_SUBMIT_DIR}
 mkdir -p logs /cluster/work/konradj/breast_mri/outputs_v17b/checkpoints
 module purge && module load Anaconda3/2023.09-0 && conda activate breast_mri
-python -c "import torch; print(f'CUDA: {torch.cuda.get_device_name(0)}')"
+nvidia-smi
+python -c "import torch; print(f'CUDA: {torch.cuda.get_device_name(0)}'); torch.cuda.empty_cache()"
 python scripts/train.py --config configs/idun_v17b.yaml
