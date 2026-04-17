@@ -183,22 +183,32 @@ def find_target_layer(model):
 # ------------------------------------------------------------------ #
 # Plotting                                                            #
 # ------------------------------------------------------------------ #
-def _axial_slice(vol, z):
-    """vol shape [D,H,W] -> 2D [H,W] at depth z."""
-    return vol[z]
+def _slice_axis(vol):
+    """Return the axis index of the slice (depth) direction.
+
+    MONAI loads NIfTI as [H, W, D] after EnsureChannelFirstd + Resized with
+    spatial_size=(224, 224, 32) → volume is [224, 224, 32]. The slice axis is
+    the smallest one. We detect it robustly rather than hardcoding."""
+    return int(np.argmin(vol.shape))
+
+
+def _axial_slice(vol, z, axis):
+    """Take the 2D slice at index z along the slice axis."""
+    return np.take(vol, indices=z, axis=axis)
 
 
 def plot_multi_slice(sub1, cam, probs, label, uid, out_path,
                      n_slices=5, alpha=0.45):
-    """Grid of N axial slices with heatmap overlay. sub1/cam shape [D,H,W]."""
-    D = sub1.shape[0]
+    """Grid of N axial slices with heatmap overlay."""
+    axis = _slice_axis(sub1)
+    D = sub1.shape[axis]
     # Evenly spaced slices, but stay away from edges which are often empty
     z_idx = np.linspace(D * 0.2, D * 0.8, n_slices).astype(int)
 
     fig, axes = plt.subplots(2, n_slices, figsize=(3.2 * n_slices, 6.8))
     for j, z in enumerate(z_idx):
-        img = _axial_slice(sub1, z)
-        heat = _axial_slice(cam, z)
+        img = _axial_slice(sub1, z, axis)
+        heat = _axial_slice(cam, z, axis)
 
         # Row 0: grayscale MRI
         axes[0, j].imshow(img, cmap="gray", vmin=np.percentile(img, 1),
@@ -225,13 +235,16 @@ def plot_multi_slice(sub1, cam, probs, label, uid, out_path,
 
 def plot_hero_slice(sub1, cam, probs, label, uid, out_path, alpha=0.45):
     """Single middle-slice figure at larger size — presentation hero shot."""
-    D = sub1.shape[0]
+    axis = _slice_axis(sub1)
+    D = sub1.shape[axis]
     # Pick slice with highest Grad-CAM activation (the 'most interesting' one)
-    per_slice = cam.reshape(D, -1).mean(axis=1)
+    # Move slice axis to front, then mean over (H, W) for each slice.
+    cam_moved = np.moveaxis(cam, axis, 0)  # [D, ...]
+    per_slice = cam_moved.reshape(D, -1).mean(axis=1)
     z = int(np.argmax(per_slice))
 
-    img = _axial_slice(sub1, z)
-    heat = _axial_slice(cam, z)
+    img = _axial_slice(sub1, z, axis)
+    heat = _axial_slice(cam, z, axis)
 
     fig, axes = plt.subplots(1, 2, figsize=(10, 5.2))
     axes[0].imshow(img, cmap="gray", vmin=np.percentile(img, 1),
