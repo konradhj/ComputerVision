@@ -198,7 +198,7 @@ def _axial_slice(vol, z, axis):
 
 
 def plot_multi_slice(sub1, cam, probs, label, uid, out_path,
-                     n_slices=5, alpha=0.45):
+                     n_slices=5, alpha=0.45, target_class=2):
     """Grid of N axial slices with heatmap overlay."""
     axis = _slice_axis(sub1)
     D = sub1.shape[axis]
@@ -223,7 +223,8 @@ def plot_multi_slice(sub1, cam, probs, label, uid, out_path,
         axes[1, j].axis("off")
 
     p = probs
-    title = (f"Grad-CAM · v17b (InstanceNorm ResNet50) · Sub_1\n"
+    title = (f"Grad-CAM · v17b (InstanceNorm ResNet50) · Sub_1 · "
+             f"target class = {CLASS_NAMES[target_class]}\n"
              f"UID {uid}  |  true = {CLASS_NAMES[label]}  |  "
              f"p(normal)={p[0]:.2f}  p(benign)={p[1]:.2f}  "
              f"p(malignant)={p[2]:.2f}")
@@ -233,7 +234,8 @@ def plot_multi_slice(sub1, cam, probs, label, uid, out_path,
     plt.close(fig)
 
 
-def plot_hero_slice(sub1, cam, probs, label, uid, out_path, alpha=0.45):
+def plot_hero_slice(sub1, cam, probs, label, uid, out_path, alpha=0.45,
+                    target_class=2):
     """Single middle-slice figure at larger size — presentation hero shot."""
     axis = _slice_axis(sub1)
     D = sub1.shape[axis]
@@ -255,12 +257,13 @@ def plot_hero_slice(sub1, cam, probs, label, uid, out_path, alpha=0.45):
     axes[1].imshow(img, cmap="gray", vmin=np.percentile(img, 1),
                    vmax=np.percentile(img, 99))
     im = axes[1].imshow(heat, cmap="jet", alpha=alpha, vmin=0.0, vmax=1.0)
-    axes[1].set_title("+ Grad-CAM (malignant class)", fontsize=12)
+    axes[1].set_title(f"+ Grad-CAM ({CLASS_NAMES[target_class]} class)",
+                      fontsize=12)
     axes[1].axis("off")
 
     p = probs
     title = (f"v17b · UID {uid}  |  true = {CLASS_NAMES[label]}  |  "
-             f"p(malignant) = {p[2]:.2f}")
+             f"p({CLASS_NAMES[target_class]}) = {p[target_class]:.2f}")
     fig.suptitle(title, fontsize=13)
     cbar = fig.colorbar(im, ax=axes[1], fraction=0.046, pad=0.04)
     cbar.set_label("Grad-CAM (normalized)", rotation=270, labelpad=14)
@@ -353,9 +356,11 @@ def main():
     hero_path = out_dir / f"{base}_hero.png"
 
     plot_multi_slice(sub1, cam, probs, chosen["label"], chosen["uid"],
-                     multi_path, alpha=args.alpha)
+                     multi_path, alpha=args.alpha,
+                     target_class=args.target_class)
     plot_hero_slice(sub1, cam, probs, chosen["label"], chosen["uid"],
-                    hero_path, alpha=args.alpha)
+                    hero_path, alpha=args.alpha,
+                    target_class=args.target_class)
 
     print(f"\nSaved:")
     print(f"  {multi_path}")
